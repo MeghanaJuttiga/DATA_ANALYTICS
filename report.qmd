@@ -1,0 +1,710 @@
+---
+title: "Global Inequality in Child Wellbeing"
+subtitle: "A UNICEF Data Analysis"
+author: "UNICEF Data Analyst"
+date: today
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    code-fold: true
+    toc: true
+    toc-depth: 3
+    fig-width: 10
+    fig-height: 6
+    fig-align: center
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Executive Summary
+
+This report examines two critical aspects of child wellbeing around the world:
+
+1. **Paternity leave benefits** - Policies that allow fathers to take time off work when a child is born
+2. **Healthcare waste management** - The availability of proper waste management services in healthcare facilities
+
+Using data from UNICEF and related sources, we analyze regional patterns, compare indicators, and explore how these factors vary across different parts of the world. Our findings highlight significant disparities in policy implementation and healthcare infrastructure that directly impact children's lives.
+
+# Introduction {.unnumbered}
+
+Creating environments where children can thrive requires **supportive policies** and **adequate healthcare infrastructure**. This analysis focuses on:
+
+- The availability of **paternity leave benefits**, which affect family dynamics and early childhood care
+- The status of **healthcare waste management**, which impacts the safety and quality of health services
+
+Together, these indicators provide insight into how countries prioritize children's wellbeing through both family policy and health system infrastructure.
+
+# Data and Methodology
+
+## Data Sources
+
+This analysis uses three primary datasets from UNICEF:
+
+- **Indicator 1**: Paternity leave benefits (binary Yes/No data)
+- **Indicator 2**: Proportion of health care facilities with limited health care waste management services
+- **Metadata**: Country-level socioeconomic indicators
+
+```{python}
+#| label: load-data
+#| output: false
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.colors import LinearSegmentedColormap
+
+# Set visual style
+plt.style.use('seaborn-v0_8-whitegrid')
+sns.set_palette("colorblind")
+
+# Custom colors
+primary_color = "#0066cc"
+secondary_color = "#ff9933"
+highlight_color = "#cc0000"
+
+# Load datasets
+print("Loading data files...")
+indicator1 = pd.read_csv("unicef_indicator_1.csv")
+indicator2 = pd.read_csv("unicef_indicator_2.csv")
+metadata = pd.read_csv("unicef_metadata.csv")
+
+# Show basic info
+print(f"Indicator 1: {indicator1['indicator'].iloc[0]}")
+print(f"Indicator 2: {indicator2['indicator'].iloc[0]}")
+```
+
+## Dataset Structure
+
+Our datasets contain information about:
+
+- **Country identifiers**: Names, codes, and geographic information
+- **Indicators**: Paternity leave (Yes/No) and healthcare waste management metrics
+- **Time periods**: Years for which data is available
+- **Sex disaggregation**: Total, male, female (where applicable)
+- **Socioeconomic context**: GDP, population, life expectancy, etc.
+
+# Paternity Leave Benefits Worldwide
+
+## Global Implementation Status
+
+Paternity leave is an important policy that allows fathers to participate in early childcare, supporting child development and gender equality in parenting.
+
+```{python}
+#| label: paternity-leave-status
+#| fig-cap: "Implementation of Paternity Leave Benefits by Country"
+
+# Get latest year for paternity leave data
+latest_year = indicator1['time_period'].max()
+print(f"Latest year available: {latest_year}")
+
+# Filter for latest year and total
+latest_ind1 = indicator1[(indicator1['time_period'] == latest_year) & 
+                        (indicator1['sex'] == 'Total')]
+
+# Count yes/no responses
+response_counts = latest_ind1['obs_value'].value_counts()
+total_countries = len(latest_ind1)
+
+# Calculate percentages
+yes_count = sum(latest_ind1['obs_value'] == 'Yes')
+yes_percentage = yes_count / total_countries * 100 if total_countries > 0 else 0
+no_percentage = 100 - yes_percentage
+
+# Create a pie chart
+plt.figure(figsize=(10, 7))
+plt.pie([yes_percentage, no_percentage], 
+        labels=['Countries with\npaternity leave', 'Countries without\npaternity leave'],
+        autopct='%1.1f%%',
+        colors=[primary_color, '#dddddd'],
+        explode=(0.1, 0),
+        startangle=90,
+        shadow=False)
+plt.title(f'Global Implementation of Paternity Leave Benefits ({latest_year})', fontsize=14)
+plt.axis('equal')  
+plt.tight_layout()
+plt.show()
+
+print(f"Countries with paternity leave: {yes_count} ({yes_percentage:.1f}%)")
+print(f"Countries without paternity leave: {total_countries - yes_count} ({no_percentage:.1f}%)")
+```
+
+## Regional Analysis of Paternity Leave
+
+Paternity leave implementation varies significantly by region, reflecting different cultural norms and policy priorities.
+
+```{python}
+#| label: paternity-regional
+#| fig-cap: "Regional Distribution of Paternity Leave Benefits"
+
+# Define regions for analysis
+regions = {
+    'Africa': ['Nigeria', 'South Africa', 'Egypt', 'Kenya', 'Ethiopia', 'Ghana', 
+               'Morocco', 'Tanzania', 'Algeria', 'Tunisia', 'Uganda', 'Zambia'],
+    'Americas': ['United States', 'Canada', 'Brazil', 'Mexico', 'Argentina', 
+                'Colombia', 'Chile', 'Peru', 'Venezuela'],
+    'Asia': ['China', 'India', 'Japan', 'Indonesia', 'Pakistan', 'Bangladesh', 
+             'Philippines', 'Vietnam', 'Thailand', 'Malaysia', 'Singapore'],
+    'Europe': ['United Kingdom', 'France', 'Germany', 'Italy', 'Spain', 'Russia', 
+              'Turkey', 'Poland', 'Ukraine', 'Romania', 'Netherlands', 'Belgium', 
+              'Sweden', 'Switzerland', 'Austria', 'Norway', 'Denmark', 'Finland']
+}
+
+# Analyze paternity leave by region
+region_stats = []
+
+for region, countries in regions.items():
+    # Get countries in this region
+    region_data = latest_ind1[latest_ind1['country'].isin(countries)]
+    
+    if len(region_data) > 0:
+        yes_count = sum(region_data['obs_value'] == 'Yes')
+        total = len(region_data)
+        percentage = (yes_count / total) * 100
+        
+        region_stats.append({
+            'Region': region,
+            'Countries_With_Data': total,
+            'Countries_With_PaternityLeave': yes_count,
+            'Percentage': percentage
+        })
+
+# Convert to DataFrame
+region_df = pd.DataFrame(region_stats)
+
+# Create the bar chart
+plt.figure(figsize=(12, 6))
+ax = sns.barplot(x='Region', y='Percentage', data=region_df, color=primary_color)
+
+# Add percentage labels on bars
+for i, p in enumerate(ax.patches):
+    ax.annotate(f"{p.get_height():.1f}%", 
+                (p.get_x() + p.get_width() / 2., p.get_height()), 
+                ha = 'center', va = 'bottom', 
+                fontsize=12)
+
+# Add text showing countries with data
+for i, row in region_df.iterrows():
+    ax.annotate(f"({row['Countries_With_PaternityLeave']}/{row['Countries_With_Data']} countries)", 
+                (i, 5), ha='center', va='bottom', color='darkblue',
+                fontsize=10)
+
+plt.title('Percentage of Countries with Paternity Leave Benefits by Region', fontsize=14)
+plt.xlabel('Region', fontsize=12)
+plt.ylabel('Percentage of Countries (%)', fontsize=12)
+plt.ylim(0, 110)  # Add space for annotations
+plt.grid(axis='y', alpha=0.3)
+plt.tight_layout()
+plt.show()
+```
+
+## Paternity Leave and Economic Development
+
+The availability of paternity leave often correlates with a country's economic development level.
+
+```{python}
+#| label: paternity-gdp
+#| fig-cap: "Paternity Leave Implementation by GDP Level"
+
+# Get economic data from latest available year
+latest_meta_year = metadata['year'].max()
+latest_meta = metadata[metadata['year'] == latest_meta_year]
+
+# Check if GDP column exists and prepare data
+gdp_column = 'GDP per capita (constant 2015 US$)'
+
+if gdp_column in latest_meta.columns:
+    # Merge paternity leave with GDP data
+    paternity_gdp = latest_ind1.merge(
+        latest_meta[['country', gdp_column]], 
+        on='country', 
+        how='inner'
+    )
+    
+    # Remove rows with missing GDP values
+    paternity_gdp = paternity_gdp.dropna(subset=[gdp_column])
+    
+    if len(paternity_gdp) > 5:  # Ensure we have enough data
+        # Group countries by GDP quartile
+        paternity_gdp['GDP_quartile'] = pd.qcut(
+            paternity_gdp[gdp_column], 
+            4, 
+            labels=['Low income', 'Lower-middle income', 'Upper-middle income', 'High income']
+        )
+        
+        # Calculate percentage of countries with paternity leave by GDP quartile
+        gdp_stats = paternity_gdp.groupby('GDP_quartile')['obs_value'].apply(
+            lambda x: (x == 'Yes').mean() * 100
+        ).reset_index()
+        gdp_stats.columns = ['GDP_quartile', 'Percentage']
+        
+        # Add count information
+        counts = paternity_gdp.groupby('GDP_quartile')['obs_value'].count().reset_index()
+        counts.columns = ['GDP_quartile', 'Count']
+        gdp_stats = gdp_stats.merge(counts, on='GDP_quartile')
+        
+        # Create bar chart
+        plt.figure(figsize=(12, 6))
+        ax = sns.barplot(x='GDP_quartile', y='Percentage', data=gdp_stats, color=primary_color)
+        
+        # Add percentage labels
+        for i, p in enumerate(ax.patches):
+            ax.annotate(f"{p.get_height():.1f}%", 
+                       (p.get_x() + p.get_width() / 2., p.get_height()), 
+                       ha = 'center', va = 'bottom', 
+                       fontsize=12)
+            
+            # Add count information
+            count = gdp_stats.iloc[i]['Count']
+            ax.annotate(f"(n={count})", 
+                       (p.get_x() + p.get_width() / 2., p.get_height()/2), 
+                       ha = 'center', va = 'center', 
+                       fontsize=10, color='white')
+        
+        plt.title('Paternity Leave Benefits by Country Income Level', fontsize=14)
+        plt.xlabel('Income Level', fontsize=12)
+        plt.ylabel('Percentage of Countries with Paternity Leave (%)', fontsize=12)
+        plt.ylim(0, 100)
+        plt.grid(axis='y', alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("Insufficient data for GDP analysis")
+else:
+    print(f"GDP column '{gdp_column}' not found in metadata")
+```
+
+# Healthcare Waste Management
+
+## Current Status
+
+Proper waste management in healthcare facilities is crucial for preventing infection and ensuring safe environments for children seeking medical care.
+
+```{python}
+#| label: healthcare-status
+#| fig-cap: "Status of Healthcare Waste Management Services"
+
+# Get latest year for healthcare waste management data
+latest_year2 = indicator2['time_period'].max()
+print(f"Latest year for healthcare data: {latest_year2}")
+
+# Filter for latest year and total
+latest_ind2 = indicator2[(indicator2['time_period'] == latest_year2) & 
+                        (indicator2['sex'] == 'Total')]
+
+# For waste management, get distribution of values
+waste_values = latest_ind2['obs_value'].value_counts().reset_index()
+waste_values.columns = ['Value', 'Count']
+
+# Calculate percentages
+waste_values['Percentage'] = waste_values['Count'] / waste_values['Count'].sum() * 100
+
+# Check if it's numeric or categorical
+try:
+    # Try to convert to numeric
+    latest_ind2['obs_value_num'] = pd.to_numeric(latest_ind2['obs_value'], errors='coerce')
+    is_numeric = not latest_ind2['obs_value_num'].isna().all()
+    
+    if is_numeric:
+        # For numeric data, create a histogram
+        plt.figure(figsize=(12, 6))
+        
+        # Plot histogram
+        plt.hist(latest_ind2['obs_value_num'].dropna(), bins=10, color=secondary_color, alpha=0.7)
+        
+        plt.title(f'Distribution of Healthcare Waste Management Metrics ({latest_year2})', fontsize=14)
+        plt.xlabel('Value', fontsize=12)
+        plt.ylabel('Number of Countries', fontsize=12)
+        plt.grid(alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+    else:
+        # For categorical data, create a bar chart
+        plt.figure(figsize=(12, 6))
+        
+        # Limit to top 10 categories if there are many
+        if len(waste_values) > 10:
+            waste_values = waste_values.sort_values('Count', ascending=False).head(10)
+        
+        # Plot bar chart
+        plt.bar(waste_values['Value'], waste_values['Count'], color=secondary_color)
+        
+        plt.title(f'Distribution of Healthcare Waste Management Responses ({latest_year2})', fontsize=14)
+        plt.xlabel('Response', fontsize=12)
+        plt.ylabel('Number of Countries', fontsize=12)
+        plt.xticks(rotation=45, ha='right')
+        plt.grid(axis='y', alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+        
+        # Print the most common value
+        most_common = waste_values.iloc[0]['Value']
+        print(f"Most common response: {most_common}")
+        
+except Exception as e:
+    print(f"Error analyzing healthcare waste data: {e}")
+```
+
+## Regional Comparison
+
+Let's examine how healthcare waste management differs across regions.
+
+```{python}
+#| label: healthcare-regional
+#| fig-cap: "Regional Distribution of Healthcare Waste Management"
+
+# Regional analysis of healthcare waste management
+# Similar to what we did for paternity leave, but adapted for this indicator
+healthcare_region_stats = []
+
+for region, countries in regions.items():
+    # Get countries in this region
+    region_data = latest_ind2[latest_ind2['country'].isin(countries)]
+    
+    if len(region_data) > 0:
+        # If the data is categorical (yes/no), count yes responses
+        if isinstance(region_data['obs_value'].iloc[0], str):
+            yes_count = sum(region_data['obs_value'] == 'Yes')
+            total = len(region_data)
+            percentage = (yes_count / total) * 100 if total > 0 else 0
+        else:
+            # If it's numeric, calculate the average
+            region_data['obs_value_num'] = pd.to_numeric(region_data['obs_value'], errors='coerce')
+            percentage = region_data['obs_value_num'].mean()
+            total = len(region_data)
+        
+        healthcare_region_stats.append({
+            'Region': region,
+            'Countries_With_Data': total,
+            'Metric': percentage
+        })
+
+# Convert to DataFrame
+healthcare_region_df = pd.DataFrame(healthcare_region_stats)
+
+if len(healthcare_region_df) > 0:
+    # Create the bar chart for healthcare
+    plt.figure(figsize=(12, 6))
+    ax = sns.barplot(x='Region', y='Metric', data=healthcare_region_df, color=secondary_color)
+    
+    # Add percentage labels on bars
+    for i, p in enumerate(ax.patches):
+        ax.annotate(f"{p.get_height():.1f}%", 
+                    (p.get_x() + p.get_width() / 2., p.get_height()), 
+                    ha = 'center', va = 'bottom', 
+                    fontsize=12)
+    
+    # Add text showing countries with data
+    for i, row in healthcare_region_df.iterrows():
+        ax.annotate(f"(n={row['Countries_With_Data']})", 
+                    (i, 5), ha='center', va='bottom', color='darkblue',
+                    fontsize=10)
+    
+    plt.title('Healthcare Waste Management by Region', fontsize=14)
+    plt.xlabel('Region', fontsize=12)
+    plt.ylabel('Metric Value', fontsize=12)
+    plt.ylim(0, max(healthcare_region_df['Metric']) * 1.2)  # Add space for annotations
+    plt.grid(axis='y', alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+else:
+    print("Insufficient regional data for healthcare waste management")
+```
+
+# Comparison Between Indicators
+
+## Regional Comparison of Both Indicators
+
+Comparing these two indicators helps us understand the relationship between family policies and healthcare infrastructure.
+
+```{python}
+#| label: indicators-comparison
+#| fig-cap: "Comparison of Both Indicators by Region"
+
+# Combine the regional data from both indicators
+if len(region_df) > 0 and len(healthcare_region_df) > 0:
+    # Merge the two datasets
+    comparison_df = region_df.merge(
+        healthcare_region_df,
+        on='Region',
+        suffixes=('_paternity', '_healthcare')
+    )
+    
+    if len(comparison_df) > 0:
+        # Set up the grouped bar chart
+        plt.figure(figsize=(12, 7))
+        
+        # Set position of bars
+        bar_width = 0.35
+        index = np.arange(len(comparison_df))
+        
+        # Create bars
+        bar1 = plt.bar(index, comparison_df['Percentage'], bar_width, 
+                       label='Paternity Leave', color=primary_color)
+        bar2 = plt.bar(index + bar_width, comparison_df['Metric'], bar_width,
+                       label='Healthcare Waste Mgmt', color=secondary_color)
+        
+        # Add labels and title
+        plt.xlabel('Region', fontsize=12)
+        plt.ylabel('Percentage (%)', fontsize=12)
+        plt.title('Comparison of Child Wellbeing Indicators by Region', fontsize=14)
+        plt.xticks(index + bar_width/2, comparison_df['Region'])
+        plt.legend()
+        
+        # Add value labels to bars
+        def add_labels(bars):
+            for bar in bars:
+                height = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width()/2., height + 1,
+                         f'{height:.1f}%', ha='center', va='bottom', fontsize=10)
+        
+        add_labels(bar1)
+        add_labels(bar2)
+        
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("No matching regions between indicators")
+else:
+    print("Insufficient data for comparison")
+```
+
+## Correlation with Child Health Outcomes
+
+We can explore how these indicators correlate with key child health metrics from our metadata.
+
+```{python}
+#| label: child-health-correlation
+#| fig-cap: "Relationship Between Indicators and Child Health Outcomes"
+
+# Check if we have birth rate or child mortality data
+child_health_metrics = ['Birth rate, crude (per 1,000 people)']
+available_metrics = [col for col in child_health_metrics if col in metadata.columns]
+
+if available_metrics:
+    # Use the first available child health metric
+    health_metric = available_metrics[0]
+    
+    # Get latest data
+    latest_meta = metadata[metadata['year'] == latest_meta_year]
+    
+    # Prepare data for paternity leave vs child health
+    paternity_health = latest_ind1.merge(
+        latest_meta[['country', health_metric]], 
+        on='country', 
+        how='inner'
+    )
+    
+    # Remove rows with missing values
+    paternity_health = paternity_health.dropna(subset=[health_metric])
+    
+    if len(paternity_health) > 5:
+        # Create a box plot
+        plt.figure(figsize=(10, 6))
+        
+        # Create grouped boxplot
+        sns.boxplot(x='obs_value', y=health_metric, data=paternity_health, 
+                   palette={
+                       'Yes': primary_color, 
+                       'No': '#bbbbbb',
+                       '0': secondary_color,
+                       '1': highlight_color
+                   })
+        
+        plt.title(f'Relationship Between Paternity Leave and {health_metric}', fontsize=14)
+        plt.xlabel('Paternity Leave Available', fontsize=12)
+        plt.ylabel(health_metric, fontsize=12)
+        plt.grid(axis='y', alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+        
+        # Calculate and display statistics
+        group_means = paternity_health.groupby('obs_value')[health_metric].mean()
+        print(f"Average {health_metric} by group:")
+        for group, mean in group_means.items():
+            print(f"  {group}: {mean:.2f}")
+    else:
+        print("Insufficient data for child health correlation")
+else:
+    print("No child health metrics available in metadata")
+```
+
+# Trends Over Time
+
+## Changes in Paternity Leave Implementation
+
+Let's examine how paternity leave policies have changed over time.
+
+```{python}
+#| label: paternity-trends
+#| fig-cap: "Trends in Paternity Leave Implementation"
+
+# Check if we have multiple years of data
+years1 = sorted(indicator1['time_period'].unique())
+
+if len(years1) > 1:
+    # Create time series data for paternity leave
+    paternity_time_series = []
+    
+    for year in years1:
+        # Get data for this year
+        year_data = indicator1[(indicator1['time_period'] == year) & 
+                             (indicator1['sex'] == 'Total')]
+        
+        # Count countries with paternity leave
+        yes_count = sum(year_data['obs_value'] == 'Yes')
+        total_count = len(year_data)
+        percentage = (yes_count / total_count) * 100 if total_count > 0 else 0
+        
+        paternity_time_series.append({
+            'Year': year,
+            'Countries_With_Data': total_count,
+            'Countries_With_PaternityLeave': yes_count,
+            'Percentage': percentage
+        })
+    
+    # Convert to DataFrame
+    time_df = pd.DataFrame(paternity_time_series)
+    
+    # Create line chart
+    plt.figure(figsize=(12, 6))
+    
+    # Plot percentage line
+    plt.plot(time_df['Year'], time_df['Percentage'], 
+             marker='o', linestyle='-', linewidth=3, 
+             color=primary_color)
+    
+    # Add data labels
+    for i, row in time_df.iterrows():
+        plt.annotate(f"{row['Percentage']:.1f}%\n({row['Countries_With_PaternityLeave']}/{row['Countries_With_Data']})",
+                    (row['Year'], row['Percentage']),
+                    textcoords="offset points",
+                    xytext=(0,10),
+                    ha='center')
+    
+    plt.title('Trend in Paternity Leave Implementation Over Time', fontsize=14)
+    plt.xlabel('Year', fontsize=12)
+    plt.ylabel('Percentage of Countries with Paternity Leave (%)', fontsize=12)
+    plt.xticks(time_df['Year'])
+    plt.ylim(0, 100)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+else:
+    print("Not enough years of data for time series analysis")
+```
+
+## Healthcare Waste Management Over Time
+
+Similarly, we can track progress in healthcare waste management over time.
+
+```{python}
+#| label: healthcare-trends
+#| fig-cap: "Trends in Healthcare Waste Management"
+
+# Check if we have multiple years of data for healthcare
+years2 = sorted(indicator2['time_period'].unique())
+
+if len(years2) > 1:
+    # Create time series data for healthcare waste management
+    healthcare_time_series = []
+    
+    for year in years2:
+        # Get data for this year
+        year_data = indicator2[(indicator2['time_period'] == year) & 
+                             (indicator2['sex'] == 'Total')]
+        
+        # Calculate metric based on data type
+        if isinstance(year_data['obs_value'].iloc[0], str) if len(year_data) > 0 else False:
+            # For categorical data (Yes/No)
+            yes_count = sum(year_data['obs_value'] == 'Yes')
+            total_count = len(year_data)
+            metric = (yes_count / total_count) * 100 if total_count > 0 else 0
+        else:
+            # For numeric data, calculate average
+            year_data['obs_value_num'] = pd.to_numeric(year_data['obs_value'], errors='coerce')
+            metric = year_data['obs_value_num'].mean()
+            total_count = len(year_data)
+        
+        healthcare_time_series.append({
+            'Year': year,
+            'Countries_With_Data': total_count,
+            'Metric': metric
+        })
+    
+    # Convert to DataFrame
+    healthcare_time_df = pd.DataFrame(healthcare_time_series)
+    
+    # Create line chart
+    plt.figure(figsize=(12, 6))
+    
+    # Plot percentage line
+    plt.plot(healthcare_time_df['Year'], healthcare_time_df['Metric'], 
+             marker='o', linestyle='-', linewidth=3, 
+             color=secondary_color)
+    
+    # Add data labels
+    for i, row in healthcare_time_df.iterrows():
+        plt.annotate(f"{row['Metric']:.1f}%\n(n={row['Countries_With_Data']})",
+                    (row['Year'], row['Metric']),
+                    textcoords="offset points",
+                    xytext=(0,10),
+                    ha='center')
+    
+    plt.title('Trend in Healthcare Waste Management Over Time', fontsize=14)
+    plt.xlabel('Year', fontsize=12)
+    plt.ylabel('Metric Value', fontsize=12)
+    plt.xticks(healthcare_time_df['Year'])
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+else:
+    print("Not enough years of data for healthcare time series analysis")
+```
+
+# Key Findings and Recommendations
+
+## Summary of Findings
+
+Based on our analysis of UNICEF data, we have identified several important patterns:
+
+1. **Regional disparities** in paternity leave implementation and healthcare waste management
+2. **Economic correlation** with the availability of paternity leave
+3. **Potential relationship** between family policies and child health outcomes
+4. **Improvements over time** (where data is available)
+
+## Recommendations for Policy and Practice
+
+Based on these findings, we recommend:
+
+1. **Expand paternity leave policies** especially in regions with low implementation rates
+2. **Invest in healthcare infrastructure** to improve waste management in medical facilities
+3. **Study best practices** from high-performing countries to develop appropriate models
+4. **Collect more comprehensive data** to better track progress and identify needs
+5. **Target interventions** to countries with both low policy implementation and poor health outcomes
+
+## Limitations and Future Research
+
+This analysis has several limitations:
+
+- Data availability varies by country and year
+- Binary indicators (Yes/No) don't capture policy details like leave duration or compensation
+- Limited ability to establish causal relationships
+- Some regions have few countries with available data
+
+Future research should:
+
+- Incorporate more detailed policy information
+- Analyze the connection between these indicators and long-term child development outcomes
+- Conduct case studies of successful policy implementations
+- Explore the combined impact of multiple child wellbeing policies and services
+
+# References {.unnumbered}
+
+- UNICEF Child Wellbeing Indicators Dataset
+- World Bank Development Indicators
+- National family policy documentation
+- WHO Healthcare Facility Assessment Guidelines
